@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login Form</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      width: 300px;
+      position: relative;
+    }
+
+    .close {
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .option-btns button {
+      margin: 5px;
+      width: 100%;
+    }
+
+    .input-group {
+      margin-bottom: 10px;
+    }
+      canvas#hackerCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    z-index: -1;
+  }
+  </style>
+</head>
+<body>
+
+  <canvas id="hackerCanvas"></canvas>
+<script>
+  const canvas = document.getElementById('hackerCanvas');
+  const ctx = canvas.getContext('2d');
+
+  canvas.height = window.innerHeight;
+  canvas.width = window.innerWidth;
+
+  const chars = '01';
+  const fontSize = 14;
+  const columns = canvas.width / fontSize;
+  const drops = Array.from({ length: columns }).fill(1);
+
+  function draw() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#0f0';
+    ctx.font = fontSize + 'px monospace';
+
+    for (let i = 0; i < drops.length; i++) {
+      const text = chars[Math.floor(Math.random() * chars.length)];
+      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+      if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+
+      drops[i]++;
+    }
+  }
+
+  setInterval(draw, 35);
+
+  // Adjust canvas on resize
+  window.addEventListener('resize', () => {
+    canvas.height = window.innerHeight;
+    canvas.width = window.innerWidth;
+  });
+</script>
+
+
+  <div class="login-container">
+    <img src="img/images.png" alt="Logo" class="logo" />
+    <h2>Login</h2>
+
+    <form id="loginForm" method="POST" action="login.php">
+      <div class="input-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="example@gmail.com" required />
+      </div>
+
+      <div class="input-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" placeholder="Password" required />
+        <span class="toggle-password" onclick="togglePassword()">👁️</span>
+      </div>
+
+      <div class="forgot-password">
+        <a href="#" onclick="openModal(event)">Forgot Password?</a>
+      </div>
+
+      <button type="submit">Login</button>
+    </form>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content" id="modalContent">
+      <!-- JS will render content -->
+    </div>
+  </div>
+
+ <script>
+  function togglePassword() {
+    const password = document.getElementById("password");
+    password.type = password.type === "password" ? "text" : "password";
+  }
+
+  function openModal(event) {
+    event.preventDefault();
+    document.getElementById("modal").style.display = "flex";
+    showEnterEmail();
+  }
+
+  function closeModal() {
+    document.getElementById("modal").style.display = "none";
+  }
+
+  function showEnterEmail() {
+    const modalContent = document.getElementById("modalContent");
+    modalContent.innerHTML = `
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3>Forgot Password</h3>
+      <input type="email" id="userEmail" placeholder="Enter your email" required />
+      <button onclick="verifyEmail()">Next</button>
+    `;
+  }
+
+  function verifyEmail() {
+    const email = document.getElementById("userEmail").value;
+    if (!email || !email.includes("@")) {
+      alert("Enter a valid email.");
+      return;
+    }
+
+    showRecoveryOptions(email);
+  }
+
+  function showRecoveryOptions(email) {
+    const modalContent = document.getElementById("modalContent");
+    modalContent.innerHTML = `
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3>Choose Recovery Option</h3>
+      <input type="hidden" id="storedEmail" value="${email}" />
+      <div class="option-btns">
+        <button onclick="sendCodeToEmail()">Send Code to Email</button>
+        <button onclick="startSecurityQuestion()">Answer Security Question</button>
+      </div>
+    `;
+  }
+
+  function sendCodeToEmail() {
+    const email = document.getElementById("storedEmail").value;
+
+    fetch('autloads/send_code.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(email)}`
+    })
+    .then(res => res.text())
+    .then(response => {
+      if (response === "success") {
+        showEnterCode(email);
+      } else {
+        alert("Failed to send code. Try again.");
+      }
+    });
+  }
+
+  // ✅ NEW: Show code input field
+  function showEnterCode(email) {
+    const modalContent = document.getElementById("modalContent");
+    modalContent.innerHTML = `
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3>Enter Verification Code</h3>
+      <input type="hidden" id="resetEmail" value="${email}" />
+      <input type="text" id="verificationCode" placeholder="Enter code sent to email" />
+      <button onclick="validateCode()">Verify</button>
+    `;
+  }
+
+  // ✅ NEW: Validate code
+  function validateCode() {
+    const email = document.getElementById("resetEmail").value;
+    const code = document.getElementById("verificationCode").value;
+
+    fetch('autloads/verify_code.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success') {
+        showResetForm(email);
+      } else {
+        alert("Invalid or expired code.");
+      }
+    });
+  }
+
+  function startSecurityQuestion() {
+    const email = document.getElementById("storedEmail").value;
+
+    fetch('autloads/get_security_question.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(email)}`
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success') {
+        document.getElementById("modalContent").innerHTML = `
+          <span class="close" onclick="closeModal()">&times;</span>
+          <h3>${data.question}</h3>
+          <input type="hidden" id="resetEmail" value="${email}" />
+          <input type="text" id="securityAnswer" placeholder="Your Answer" />
+          <button onclick="validateSecurityAnswer()">Submit</button>
+        `;
+      } else {
+        alert("Email not found.");
+      }
+    });
+  }
+
+  function validateSecurityAnswer() {
+    const email = document.getElementById("resetEmail").value;
+    const answer = document.getElementById("securityAnswer").value;
+
+    fetch('autloads/validate_security_answer.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(email)}&answer=${encodeURIComponent(answer)}`
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'success') {
+        showResetForm(email);
+      } else {
+        alert("Incorrect answer.");
+      }
+    });
+  }
+
+  function showResetForm(email) {
+    const modalContent = document.getElementById("modalContent");
+    modalContent.innerHTML = `
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3>Reset Password</h3>
+      <input type="hidden" id="resetEmail" value="${email}" />
+      <input type="password" id="newPass" placeholder="New Password" />
+      <input type="password" id="confirmPass" placeholder="Confirm Password" />
+      <button onclick="submitNewPassword()">Reset</button>
+    `;
+  }
+
+  function submitNewPassword() {
+    const email = document.getElementById("resetEmail").value;
+    const pass1 = document.getElementById("newPass").value;
+    const pass2 = document.getElementById("confirmPass").value;
+
+    if (pass1 !== pass2 || pass1.length < 6) {
+      alert("Passwords do not match or too short.");
+      return;
+    }
+
+    fetch('autloads/reset_password.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(email)}&new_password=${encodeURIComponent(pass1)}`
+    })
+    .then(res => res.text())
+    .then(msg => {
+      alert(msg);
+      closeModal();
+    });
+  }
+</script>
+
+</body>
+</html>
